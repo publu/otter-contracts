@@ -279,20 +279,11 @@ contract OtterBondStakeDepository is Ownable {
         IOtterStaking(staking).claim(address(this));
 
         uint256 stakeGons = IsCLAM(sCLAM).gonsForBalance(payout);
-        uint256 vesting = terms
-            .vestingTerm
-            .mul(stakeGons)
-            .add(
-                bondInfo[_depositor].vesting.mul(
-                    bondInfo[_depositor].gonsPayout
-                )
-            )
-            .div(bondInfo[_depositor].gonsPayout.add(stakeGons));
         // depositor info is stored
         bondInfo[_depositor] = Bond({
             gonsPayout: bondInfo[_depositor].gonsPayout.add(stakeGons),
             payout: bondInfo[_depositor].payout.add(payout),
-            vesting: vesting,
+            vesting: terms.vestingTerm,
             lastTimestamp: block.timestamp,
             pricePaid: priceInUSD
         });

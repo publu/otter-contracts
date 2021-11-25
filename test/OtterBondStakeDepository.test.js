@@ -15,13 +15,13 @@ describe('OtterBondStakeDepository', () => {
   const firstEpochNumber = '0'
 
   // How many seconds are in each epoch
-  const epochLength = 10
+  const epochLength = 86400 / 3
 
   // Ethereum 0 address, used when toggling changes in treasury
   const zeroAddress = '0x0000000000000000000000000000000000000000'
 
   // Initial staking index
-  const initialIndex = '1000000000'
+  const initialIndex = '1737186817'
 
   const initialRewardRate = '5000'
 
@@ -256,7 +256,7 @@ describe('OtterBondStakeDepository', () => {
       const bcv = 300
       const bondVestingLength = 15
       const minBondPrice = 400 // bond price = $4
-      const maxBondPayout = 1000 // 1000 = 1% of CLAM total supply
+      const maxBondPayout = 10000 // 1000 = 1% of CLAM total supply
       const daoFee = 10000 // DAO fee for bond
       const maxBondDebt = '8000000000000000'
       const initialBondDebt = 0
@@ -273,15 +273,67 @@ describe('OtterBondStakeDepository', () => {
       expect(await daiBond.bondPriceInUSD()).to.eq(parseEther('4'))
 
       await expect(() =>
-        daiBond.deposit(parseEther('100'), largeApproval, deployer.address)
-      ).to.changeTokenBalance(clam, dao, parseUnits('25', 9))
+        daiBond.deposit(parseEther('1000'), largeApproval, deployer.address)
+      ).to.changeTokenBalance(clam, dao, parseUnits('250', 9))
 
-      await timeAndMine.setTimeIncrease(15)
+      await timeAndMine.setTimeIncrease(432001)
       await staking.rebase()
 
       await expect(() =>
         daiBond.redeem(deployer.address, false)
-      ).to.changeTokenBalance(sClam, deployer, '37750000000')
+      ).to.changeTokenBalance(sClam, deployer, parseUnits('265', 9))
+    })
+
+    it('should deploy twice and redeem sCLAM when vested fully', async () => {
+      await treasury.deposit(
+        parseEther('100000'),
+        dai.address,
+        parseUnits('75000', 9)
+      )
+
+      const bcv = 300
+      const bondVestingLength = 15
+      const minBondPrice = 5000 // bond price = $50
+      const maxBondPayout = 10000 // 1000 = 1% of CLAM total supply
+      const daoFee = 10000 // DAO fee for bond
+      const maxBondDebt = '8000000000000000'
+      const initialBondDebt = 0
+      await daiBond.initializeBondTerms(
+        bcv,
+        bondVestingLength,
+        minBondPrice,
+        maxBondPayout, // Max bond payout,
+        daoFee,
+        maxBondDebt,
+        initialBondDebt
+      )
+
+      expect(await daiBond.bondPriceInUSD()).to.eq(parseEther('50'))
+
+      await expect(() =>
+        daiBond.deposit(parseEther('50'), largeApproval, deployer.address)
+      ).to.changeTokenBalance(clam, dao, parseUnits('1', 9))
+      await expect(() =>
+        daiBond.connect(depositor).deposit(parseEther('500'), largeApproval, depositor.address)
+      ).to.changeTokenBalance(clam, dao, parseUnits('10', 9))
+
+      await timeAndMine.setTimeIncrease(86400)
+      await staking.rebase()
+
+      await expect(() =>
+        daiBond.deposit(parseEther('3000'), largeApproval, deployer.address)
+      ).to.changeTokenBalance(clam, dao, parseUnits('60', 9))
+
+      await timeAndMine.setTimeIncrease(432001)
+      await staking.rebase()
+
+      await expect(() =>
+        daiBond.redeem(deployer.address, false)
+      ).to.changeTokenBalance(sClam, deployer, '116861328128')
+
+      await expect(() =>
+        daiBond.redeem(depositor.address, false)
+      ).to.changeTokenBalance(sClam, depositor, '331847447121')
     })
   })
 })
