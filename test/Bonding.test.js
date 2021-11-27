@@ -26,11 +26,8 @@ describe('Bonding', () => {
     // Used as the default user for deposits and trade. Intended to be the default regular user.
     depositor,
     clam,
-    sClam,
     dai,
     treasury,
-    staking,
-    stakingHelper,
     daiBond,
     firstEpochTime
 
@@ -45,9 +42,6 @@ describe('Bonding', () => {
 
     const DAI = await ethers.getContractFactory('DAI')
     dai = await DAI.deploy(0)
-
-    const StakedCLAM = await ethers.getContractFactory('StakedOtterClamERC20')
-    sClam = await StakedCLAM.deploy()
 
     const Treasury = await ethers.getContractFactory('OtterTreasury')
     treasury = await Treasury.deploy(
@@ -67,30 +61,6 @@ describe('Bonding', () => {
       zeroAddress
     )
 
-    const Staking = await ethers.getContractFactory('OtterStaking')
-    staking = await Staking.deploy(
-      clam.address,
-      sClam.address,
-      epochLength,
-      firstEpochNumber,
-      firstEpochTime
-    )
-
-    // Deploy staking helper
-    const StakingHelper = await ethers.getContractFactory('OtterStakingHelper')
-    stakingHelper = await StakingHelper.deploy(staking.address, clam.address)
-
-    const StakingWarmup = await ethers.getContractFactory('OtterStakingWarmup')
-    const stakingWarmup = await StakingWarmup.deploy(
-      staking.address,
-      sClam.address
-    )
-
-    await sClam.initialize(staking.address)
-    await sClam.setIndex(initialIndex)
-
-    await staking.setContract('1', stakingWarmup.address)
-
     await clam.setVault(treasury.address)
 
     // queue and toggle deployer reserve depositor
@@ -100,9 +70,8 @@ describe('Bonding', () => {
     await treasury.queue('0', daiBond.address)
     await treasury.toggle('0', daiBond.address, zeroAddress)
 
-    await daiBond.setStaking(stakingHelper.address, true)
+    console.log("b4 approval");
 
-    await clam.approve(stakingHelper.address, largeApproval)
     await dai.approve(treasury.address, largeApproval)
     await dai.approve(daiBond.address, largeApproval)
 
@@ -230,7 +199,7 @@ describe('Bonding', () => {
       await timeAndMine.setTimeIncrease(2)
 
       await expect(() =>
-        daiBond.redeem(deployer.address, false)
+        daiBond.redeem(deployer.address)
       ).to.changeTokenBalance(
         clam,
         deployer,
@@ -251,7 +220,7 @@ describe('Bonding', () => {
 
       await timeAndMine.setTimeIncrease(20)
       await expect(() =>
-        daiBond.redeem(deployer.address, false)
+        daiBond.redeem(deployer.address)
       ).to.changeTokenBalance(clam, deployer, '30834236186')
     })
 
@@ -290,13 +259,13 @@ describe('Bonding', () => {
       // vested 20%
       await timeAndMine.setTimeIncrease(2)
       await expect(() =>
-        daiBond.redeem(deployer.address, false)
+        daiBond.redeem(deployer.address)
       ).to.changeTokenBalance(clam, deployer, totalClam.div(5))
 
       // fully vested, get rest 80%
       await timeAndMine.setTimeIncrease(10)
       await expect(() =>
-        daiBond.redeem(deployer.address, false)
+        daiBond.redeem(deployer.address)
       ).to.changeTokenBalance(clam, deployer, totalClam - totalClam.div(5))
     })
 
@@ -338,9 +307,7 @@ describe('Bonding', () => {
 
       await timeAndMine.setTimeIncrease(2)
 
-      await daiBond.redeem(deployer.address, true)
-
-      expect(await sClam.balanceOf(deployer.address)).to.eq('5000000000')
+      await daiBond.redeem(deployer.address)
     })
   })
 })

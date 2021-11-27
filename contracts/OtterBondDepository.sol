@@ -270,17 +270,16 @@ contract OtterBondDepository is Ownable {
     /**
      *  @notice redeem bond for user
      *  @param _recipient address
-     *  @param _stake bool
      *  @return uint
      */
-    function redeem( address _recipient, bool _stake ) external returns ( uint ) {
+    function redeem( address _recipient ) external returns ( uint ) {
         Bond memory info = bondInfo[ _recipient ];
         uint percentVested = percentVestedFor( _recipient ); // (blocks since last interaction / vesting term remaining)
 
         if ( percentVested >= 10000 ) { // if fully vested
             delete bondInfo[ _recipient ]; // delete user info
             emit BondRedeemed( _recipient, info.payout, 0 ); // emit bond data
-            return stakeOrSend( _recipient, _stake, info.payout ); // pay user everything due
+            return stakeOrSend( _recipient, info.payout ); // pay user everything due
 
         } else { // if unfinished
             // calculate payout vested
@@ -295,7 +294,7 @@ contract OtterBondDepository is Ownable {
             });
 
             emit BondRedeemed( _recipient, payout, bondInfo[ _recipient ].payout );
-            return stakeOrSend( _recipient, _stake, payout );
+            return stakeOrSend( _recipient, payout );
         }
     }
 
@@ -306,22 +305,12 @@ contract OtterBondDepository is Ownable {
 
     /**
      *  @notice allow user to stake payout automatically
-     *  @param _stake bool
+     *  @param _recipient address
      *  @param _amount uint
      *  @return uint
      */
-    function stakeOrSend( address _recipient, bool _stake, uint _amount ) internal returns ( uint ) {
-        if ( !_stake ) { // if user does not want to stake
-            IERC20( CLAM ).transfer( _recipient, _amount ); // send payout
-        } else { // if user wants to stake
-            if ( useHelper ) { // use if staking warmup is 0
-                IERC20( CLAM ).approve( stakingHelper, _amount );
-                IStakingHelper( stakingHelper ).stake( _amount, _recipient );
-            } else {
-                IERC20( CLAM ).approve( staking, _amount );
-                IOtterStaking( staking ).stake( _amount, _recipient );
-            }
-        }
+    function stakeOrSend( address _recipient, uint _amount ) internal returns ( uint ) {
+        IERC20( CLAM ).transfer( _recipient, _amount ); // send payout
         return _amount;
     }
 
