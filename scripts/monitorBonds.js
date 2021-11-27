@@ -12,8 +12,9 @@ async function main() {
     'OtterBondDepository'
   )
   const bonds = [
-    { name: 'MAI', address: '0x603A74Fd527b85E0A1e205517c1f24aC71f5C263' },
+    { name: 'MAI', address: '0x779CB532e289CbaA3d0692Ae989C63C2B4fBd4d0' },
     { name: 'CLAM-MAI', address: '0x706587BD39322A6a78ddD5491cDbb783F8FD983E' },
+    { name: 'FRAX', address: '0x9e1430EB3b56e8953a342BFBBdD2DDC3b6E84d9D' },
   ]
 
   for (const { name, address } of bonds) {
@@ -37,6 +38,7 @@ async function main() {
           2
         )
       )
+      console.log(`=================================== ` + new Date())
     })
   }
 
@@ -71,7 +73,7 @@ async function fetchBondInfo(name, bond) {
           adjustment[0] ? '+' : '-'
         }${adjustment[1].toString()} target: ${adjustment[2].toString()} buffer: ${adjustment[3].toString()}`,
         debtRatio:
-          name === 'MAI'
+          name === 'MAI' || name === 'FRAX'
             ? ethers.utils.formatUnits(debtRatio, 7) + '%'
             : ethers.utils.formatUnits(debtRatio, 16) + '%',
         ROI: Intl.NumberFormat('en', {
