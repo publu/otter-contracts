@@ -40,7 +40,7 @@ async function main() {
     'OtterBondStakeDepository'
   )
   // const bond = OtterBondStakeDepository.attach(
-  //   '0x54100c26ABdbF897585E22600C51924D5d3De33c'
+  //   '0xda0d7c3d751d00a1ec1c495eF7Cf3db1a202B0B9'
   // )
   const calcAddr = isLPBond ? addresses.CLAM_BONDING_CALC_ADDRESS : zeroAddress
   const bond = await OtterBondStakeDepository.deploy(
@@ -56,7 +56,6 @@ async function main() {
 
   const queueType = isLPBond ? '4' : '0'
   await (await treasury.queue(queueType, bond.address)).wait()
-  await (await treasury.queue('5', addresses.RESERVES.FRAX_CLAM)).wait()
   console.log('Bond deployed at: ' + bond.address)
 
   await hre.run('verify:verify', {
@@ -70,7 +69,6 @@ async function main() {
       calcAddr,
     ],
   })
-
 
   // await (await treasury.queue('2', reserveAddr)).wait()
 

@@ -64,8 +64,8 @@ for (var i = 0; i < 43201; i++) { await hre.network.provider.request({ method: '
 await treasury.toggle('0', fraxBond.address, zeroAddress)
 // await treasury.toggle('2', fraxAddr, zeroAddress)
 
-const tokenMinPrice = '4400'
-await fraxBond.initializeBondTerms( '120', 5 * 24 * 3600, tokenMinPrice, '50', '10000', '8000000000000000','0')
+const tokenMinPrice = '3800'
+await fraxBond.initializeBondTerms( '120', 5 * 86400, tokenMinPrice, '50', '10000', '8000000000000000','0')
 
 await hre.network.provider.request({ method: 'evm_increaseTime', params:[86400 * 2] })
 await hre.network.provider.request({ method: 'evm_mine' });
