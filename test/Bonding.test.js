@@ -73,7 +73,7 @@ describe('Bonding', () => {
       zeroAddress // change this to bondingCalc only if u need it!
     )
 
-    await daiBond.setMaxPayout("8000000000000000");
+    await daiBond.setMaxPayout("80000000000000000000000000000");
     console.log("b4 approval");
 
     await dai.approve(daiBond.address, largeApproval)
