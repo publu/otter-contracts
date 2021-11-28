@@ -1,14 +1,11 @@
+require('dotenv').config()
+
 require('@nomiclabs/hardhat-waffle')
 require('@atixlabs/hardhat-time-n-mine')
 require('@nomiclabs/hardhat-etherscan')
 require('dotenv').config()
 
 const { ethers } = require('ethers')
-const dev = process.env.DEV_PRIVATE_KEY
-const deployer = process.env.DEPLOYER_PRIVATE_KEY
-const etherscanApiKey = process.env.ETHERSCAN_API_KEY
-const polygonMainnetRPC = process.env.POLYGON_MAINNET_RPC
-const polygonMumbaiRPC = process.env.POLYGON_MUMBAI_RPC
 
 module.exports = {
   solidity: {
@@ -33,29 +30,26 @@ module.exports = {
   networks: {
     'polygon-mainnet': {
       url: 'https://polygon-rpc.com',
-      accounts: [deployer],
+      accounts: [String(process.env.MATIC_KEY)],
       gasPrice: 35000000000,
     },
     'polygon-mumbai': {
-      url: polygonMumbaiRPC,
-      accounts: [dev],
+      url: 'https://polygon-mumbai.infura.io/v3/d7dae60b5e1d40b9b31767b0086aa75d',
+      accounts: [String(process.env.MATIC_KEY)],
       gas: 'auto',
       gasPrice: ethers.utils.parseUnits('1.2', 'gwei').toNumber(),
     },
+    one : {
+      url: 'https://api.harmony.one',
+      accounts: [String(process.env.MATIC_KEY)],
+    },
     hardhat: {
       gas: 'auto',
-      forking:
-        process.env.NODE_ENV === 'test'
-          ? undefined
-          : {
-              url: polygonMainnetRPC,
-            },
+      forking: {
+        url: 'https://polygon-rpc.com'
+      }
     },
-  },
-  etherscan: {
-    apiKey: etherscanApiKey,
-  },
-  mocha: {
+  },  mocha: {
     timeout: 5 * 60 * 10000,
   },
 }
