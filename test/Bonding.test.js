@@ -19,15 +19,12 @@ describe('Bonding', () => {
   // Initial staking index
   const initialIndex = '1000000000'
 
-  const daoAddr = '0x176311b81309240a8700BCC6129D5dF85087358D'
-
   let // Used as default deployer for contracts, asks as owner of contracts.
     deployer,
     // Used as the default user for deposits and trade. Intended to be the default regular user.
     depositor,
     clam,
     dai,
-    treasury,
     daiBond,
     firstEpochTime
 
@@ -36,50 +33,49 @@ describe('Bonding', () => {
 
     firstEpochTime = (await deployer.provider.getBlock()).timestamp - 100
 
-    const CLAM = await ethers.getContractFactory('OtterClamERC20')
-    clam = await CLAM.deploy()
-    await clam.setVault(deployer.address)
+    const clam = await ethers.getContractAt(
+      'OtterClamERC20',
+      '0x580a84c73811e1839f75d86d75d88cca0c241ff4'
+    );
 
-    const DAI = await ethers.getContractFactory('DAI')
-    dai = await DAI.deploy(0)
+    const dai = await ethers.getContractAt(
+      'OtterClamERC20',
+      '0x9A8b2601760814019B7E6eE0052E25f1C623D1E6'
+    );// but actually qi/matic lp
 
-    const Treasury = await ethers.getContractFactory('OtterTreasury')
-    treasury = await Treasury.deploy(
-      clam.address,
-      dai.address,
-      zeroAddress,
-      zeroAddress,
-      0
+    console.log("clam.address: ", clam.address);
+
+    const BondingCalcContract = await ethers.getContractFactory(
+      'BondingCalculator'
     )
 
-    const DAIBond = await ethers.getContractFactory('OtterBondDepository')
+    const bondingCalc = await BondingCalcContract.deploy(
+      clam.address
+    )
+
+    const treasury = "0xD4FfFD3814D09c583D79Ee501D17F6F146aeFAC2";
+
+    const DAIBond = await ethers.getContractFactory('BondDepository')
+
+    console.log(
+      "DAIBond.deploy(",
+        clam.address,",",
+        dai.address,",",
+        treasury,",",
+        bondingCalc.address,
+      ")"
+    );
+
     daiBond = await DAIBond.deploy(
       clam.address,
       dai.address,
-      treasury.address,
-      daoAddr,
-      zeroAddress
+      treasury,
+      bondingCalc.address
     )
-
-    await clam.setVault(treasury.address)
-
-    // queue and toggle deployer reserve depositor
-    await treasury.queue('0', deployer.address)
-    await treasury.toggle('0', deployer.address, zeroAddress)
-
-    await treasury.queue('0', daiBond.address)
-    await treasury.toggle('0', daiBond.address, zeroAddress)
 
     console.log("b4 approval");
 
-    await dai.approve(treasury.address, largeApproval)
     await dai.approve(daiBond.address, largeApproval)
-
-    // mint 1,000,000 DAI for testing
-    await dai.mint(
-      deployer.address,
-      BigNumber.from(100 * 10000).mul(BigNumber.from(10).pow(18))
-    )
   })
 
   describe('adjust', () => {
@@ -88,7 +84,6 @@ describe('Bonding', () => {
       const bondVestingLength = 10
       const minBondPrice = 400 // bond price = $4
       const maxBondPayout = 1000 // 1000 = 1% of CLAM total supply
-      const daoFee = 10000 // DAO fee for bond
       const maxBondDebt = '8000000000000000'
       const initialBondDebt = 0
       await daiBond.initializeBondTerms(
@@ -96,7 +91,6 @@ describe('Bonding', () => {
         bondVestingLength,
         minBondPrice,
         maxBondPayout, // Max bond payout,
-        daoFee,
         maxBondDebt,
         initialBondDebt
       )
@@ -114,7 +108,6 @@ describe('Bonding', () => {
       const bondVestingLength = 10
       const minBondPrice = 400 // bond price = $4
       const maxBondPayout = 1000 // 1000 = 1% of CLAM total supply
-      const daoFee = 10000 // DAO fee for bond
       const maxBondDebt = '8000000000000000'
       const initialBondDebt = 0
       await daiBond.initializeBondTerms(
@@ -122,7 +115,6 @@ describe('Bonding', () => {
         bondVestingLength,
         minBondPrice,
         maxBondPayout, // Max bond payout,
-        daoFee,
         maxBondDebt,
         initialBondDebt
       )
@@ -137,7 +129,6 @@ describe('Bonding', () => {
       const bondVestingLength = 10
       const minBondPrice = 400 // bond price = $4
       const maxBondPayout = 1000 // 1000 = 1% of CLAM total supply
-      const daoFee = 10000 // DAO fee for bond
       const maxBondDebt = '8000000000000000'
       const initialBondDebt = 0
       await daiBond.initializeBondTerms(
@@ -145,7 +136,6 @@ describe('Bonding', () => {
         bondVestingLength,
         minBondPrice,
         maxBondPayout, // Max bond payout,
-        daoFee,
         maxBondDebt,
         initialBondDebt
       )
@@ -161,17 +151,11 @@ describe('Bonding', () => {
 
   describe('deposit', () => {
     it('should get vested fully', async () => {
-      await treasury.deposit(
-        BigNumber.from(10000).mul(BigNumber.from(10).pow(18)),
-        dai.address,
-        BigNumber.from(7500).mul(BigNumber.from(10).pow(9))
-      )
 
       const bcv = 300
       const bondVestingLength = 10
       const minBondPrice = 400 // bond price = $4
       const maxBondPayout = 1000 // 1000 = 1% of CLAM total supply
-      const daoFee = 10000 // DAO fee for bond
       const maxBondDebt = '8000000000000000'
       const initialBondDebt = 0
       await daiBond.initializeBondTerms(
@@ -179,7 +163,6 @@ describe('Bonding', () => {
         bondVestingLength,
         minBondPrice,
         maxBondPayout, // Max bond payout,
-        daoFee,
         maxBondDebt,
         initialBondDebt
       )
@@ -189,12 +172,6 @@ describe('Bonding', () => {
 
       let depositAmount = BigNumber.from(100).mul(BigNumber.from(10).pow(18))
       await daiBond.deposit(depositAmount, largeApproval, deployer.address)
-
-      const prevDAOReserve = await clam.balanceOf(daoAddr)
-      expect(prevDAOReserve).to.eq(
-        BigNumber.from(25).mul(BigNumber.from(10).pow(9))
-      )
-      console.log('dao balance: ' + formatUnits(prevDAOReserve, 9))
 
       await timeAndMine.setTimeIncrease(2)
 
@@ -213,10 +190,6 @@ describe('Bonding', () => {
       depositAmount = BigNumber.from(100).mul(BigNumber.from(10).pow(18))
 
       await daiBond.deposit(depositAmount, largeApproval, deployer.address)
-      console.log(
-        'dao balance: ' + formatUnits(await clam.balanceOf(daoAddr), 9)
-      )
-      expect(await clam.balanceOf(daoAddr)).to.eq('35834236186')
 
       await timeAndMine.setTimeIncrease(20)
       await expect(() =>
@@ -225,17 +198,11 @@ describe('Bonding', () => {
     })
 
     it('should get vested partially', async () => {
-      await treasury.deposit(
-        BigNumber.from(10000).mul(BigNumber.from(10).pow(18)),
-        dai.address,
-        BigNumber.from(7500).mul(BigNumber.from(10).pow(9))
-      )
 
       const bcv = 300
       const bondVestingLength = 10
       const minBondPrice = 400 // bond price = $4
       const maxBondPayout = 1000 // 1000 = 1% of CLAM total supply
-      const daoFee = 10000 // DAO fee for bond
       const maxBondDebt = '8000000000000000'
       const initialBondDebt = 0
       await daiBond.initializeBondTerms(
@@ -243,7 +210,6 @@ describe('Bonding', () => {
         bondVestingLength,
         minBondPrice,
         maxBondPayout, // Max bond payout,
-        daoFee,
         maxBondDebt,
         initialBondDebt
       )
@@ -270,17 +236,11 @@ describe('Bonding', () => {
     })
 
     it('should staked directly', async () => {
-      await treasury.deposit(
-        BigNumber.from(10000).mul(BigNumber.from(10).pow(18)),
-        dai.address,
-        BigNumber.from(7500).mul(BigNumber.from(10).pow(9))
-      )
 
       const bcv = 300
       const bondVestingLength = 10
       const minBondPrice = 400 // bond price = $4
       const maxBondPayout = 1000 // 1000 = 1% of CLAM total supply
-      const daoFee = 10000 // DAO fee for bond
       const maxBondDebt = '8000000000000000'
       const initialBondDebt = 0
       await daiBond.initializeBondTerms(
@@ -288,7 +248,6 @@ describe('Bonding', () => {
         bondVestingLength,
         minBondPrice,
         maxBondPayout, // Max bond payout,
-        daoFee,
         maxBondDebt,
         initialBondDebt
       )
@@ -298,12 +257,6 @@ describe('Bonding', () => {
 
       let depositAmount = BigNumber.from(100).mul(BigNumber.from(10).pow(18))
       await daiBond.deposit(depositAmount, largeApproval, deployer.address)
-
-      const prevDAOReserve = await clam.balanceOf(daoAddr)
-      expect(prevDAOReserve).to.eq(
-        BigNumber.from(25).mul(BigNumber.from(10).pow(9))
-      )
-      console.log('dao balance: ' + formatUnits(prevDAOReserve, 9))
 
       await timeAndMine.setTimeIncrease(2)
 
