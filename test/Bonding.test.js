@@ -70,7 +70,7 @@ describe('Bonding', () => {
       clam.address,
       dai.address,
       treasury,
-      bondingCalc.address
+      zeroAddress // change this to bondingCalc only if u need it!
     )
 
     console.log("b4 approval");

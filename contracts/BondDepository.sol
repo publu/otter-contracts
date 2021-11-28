@@ -38,6 +38,8 @@ contract BondDepository is Ownable {
     uint public totalDebt; // total value of outstanding bonds; used for pricing
     uint public lastDecay; // reference block for debt decay
 
+    uint public maxpayout;
+
     /* ======== STRUCTS ======== */
 
     // Info for creating new bonds
@@ -89,13 +91,17 @@ contract BondDepository is Ownable {
 
     /**
         @notice returns CLAM valuation of asset
-        @param _token address
         @param _amount uint
         @return value_ uint
      */
-    function valueOfToken( address _token, uint _amount ) public view returns ( uint value_ ) {
+    function valueOfToken(uint _amount ) public view returns ( uint value_ ) {
         // will only work for LP tokens.
-        value_ = IBondingCalculator( bondCalculator ).valuation( _token, _amount );
+        if ( !isLiquidityBond ) {
+            // convert amount to match CLAM decimals
+            value_ = _amount.mul( 10 ** IERC20( CLAM ).decimals() ).div( 10 ** IERC20( principle ).decimals() );
+        } else {
+            value_ = IBondingCalculator( bondCalculator ).valuation( principle, _amount );
+        }
         return value_;
     }
 
@@ -173,6 +179,28 @@ contract BondDepository is Ownable {
         });
     }
 
+    /**
+     *  @notice set max payout
+     *  @param _maxpayout uint
+     *  @return uint
+     */
+    function setMaxPayout(uint _maxpayout) public onlyOwner() returns (uint) {
+        maxpayout = _maxpayout;
+        return maxpayout;
+    }
+
+    uint public availableDebt;
+
+    /**
+     *  @notice fund bonds
+     *  @param _amount uint
+     *  @return uint
+     */
+    function fund(uint _amount) public onlyOwner() returns (uint) {
+        IERC20( CLAM ).safeTransferFrom(msg.sender, address(this), _amount );
+        availableDebt = availableDebt.add(_amount);
+    }
+
     /* ======== USER FUNCTIONS ======== */
 
     /**
@@ -197,19 +225,22 @@ contract BondDepository is Ownable {
 
         require( _maxPrice >= nativePrice, "Slippage limit: more than max price" ); // slippage protection
 
-        uint value = valueOfToken( principle, _amount );
+        uint value = valueOfToken(_amount );
         uint payout = payoutFor( value ); // payout to bonder is computed
 
         require( payout >= 10000000, "Bond too small" ); // must be > 0.01 CLAM ( underflow protection )
         require( payout <= maxPayout(), "Bond too large"); // size protection because there is no slippage
+        
+        // **** check that 
+            // payout cannot exceed the balance deposited (in CLAM)
+        require( payout < availableDebt, "Not enough reserves."); // leave 1 gwei for good luck.
 
         /*
             principle is transferred directly into the treasury
          */
         IERC20( principle ).safeTransferFrom( msg.sender, treasury, _amount );
 
-        // **** check that 
-            // payout cannot exceed the balance deposited (in CLAM)
+        availableDebt = availableDebt.sub(payout); // already checked if possible so it shouldn't underflow.
 
         // total debt is increased
         totalDebt = totalDebt.add( value );
@@ -312,7 +343,8 @@ contract BondDepository is Ownable {
      *  @return uint
      */
     function maxPayout() public view returns ( uint ) {
-        return IERC20( CLAM ).totalSupply().mul( terms.maxPayout ).div( 100000 );
+        // **** change as uint.
+        return maxpayout;//IERC20( CLAM ).totalSupply().mul( terms.maxPayout ).div( 100000 );
         // unsure about this if you have tokens on multiple chains
         // maybe having a min amount instead?
     }
