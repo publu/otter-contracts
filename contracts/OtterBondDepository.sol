@@ -2,7 +2,6 @@
 pragma solidity 0.7.5;
 
 import "./interfaces/IOtterTreasury.sol";
-import "./interfaces/IOtterStaking.sol";
 import "./interfaces/IOtterBondingCalculator.sol";
 
 import "./types/Ownable.sol";
@@ -11,10 +10,6 @@ import "./libraries/SafeMath.sol";
 import "./libraries/Math.sol";
 import "./libraries/FixedPoint.sol";
 import "./libraries/SafeERC20.sol";
-
-interface IStakingHelper {
-    function stake( uint _amount, address _recipient ) external;
-}
 
 contract OtterBondDepository is Ownable {
 
@@ -36,10 +31,6 @@ contract OtterBondDepository is Ownable {
 
     bool public immutable isLiquidityBond; // LP and Reserve bonds are treated slightly different
     address public immutable bondCalculator; // calculates value of LP tokens
-
-    address public staking; // to auto-stake payout
-    address public stakingHelper; // to stake and claim if no staking warmup
-    bool public useHelper;
 
     Terms public terms; // stores terms for new bonds
     Adjust public adjustment; // stores adjustment to BCV data
@@ -182,24 +173,6 @@ contract OtterBondDepository is Ownable {
         });
     }
 
-    /**
-     *  @notice set contract for auto stake
-     *  @param _staking address
-     *  @param _helper bool
-     */
-    function setStaking( address _staking, bool _helper ) external onlyOwner() {
-        require( _staking != address(0) );
-        if ( _helper ) {
-            useHelper = true;
-            stakingHelper = _staking;
-        } else {
-            useHelper = false;
-            staking = _staking;
-        }
-    }
-
-
-
 
     /* ======== USER FUNCTIONS ======== */
 
@@ -279,7 +252,7 @@ contract OtterBondDepository is Ownable {
         if ( percentVested >= 10000 ) { // if fully vested
             delete bondInfo[ _recipient ]; // delete user info
             emit BondRedeemed( _recipient, info.payout, 0 ); // emit bond data
-            return stakeOrSend( _recipient, info.payout ); // pay user everything due
+            return sendPayout( _recipient, info.payout ); // pay user everything due
 
         } else { // if unfinished
             // calculate payout vested
@@ -294,7 +267,7 @@ contract OtterBondDepository is Ownable {
             });
 
             emit BondRedeemed( _recipient, payout, bondInfo[ _recipient ].payout );
-            return stakeOrSend( _recipient, payout );
+            return sendPayout( _recipient, payout );
         }
     }
 
@@ -309,7 +282,7 @@ contract OtterBondDepository is Ownable {
      *  @param _amount uint
      *  @return uint
      */
-    function stakeOrSend( address _recipient, uint _amount ) internal returns ( uint ) {
+    function sendPayout( address _recipient, uint _amount ) internal returns ( uint ) {
         IERC20( CLAM ).transfer( _recipient, _amount ); // send payout
         return _amount;
     }
