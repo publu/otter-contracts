@@ -208,6 +208,9 @@ contract BondDepository is Ownable {
          */
         IERC20( principle ).safeTransferFrom( msg.sender, treasury, _amount );
 
+        // **** check that 
+            // payout cannot exceed the balance deposited (in CLAM)
+
         // total debt is increased
         totalDebt = totalDebt.add( value );
 
@@ -267,7 +270,7 @@ contract BondDepository is Ownable {
      *  @return uint
      */
     function sendPayout( address _recipient, uint _amount ) internal returns ( uint ) {
-        IERC20( CLAM ).transfer( _recipient, _amount ); // send payout
+        IERC20( CLAM ).safeTransfer( _recipient, _amount ); // send payout
         return _amount;
     }
 
