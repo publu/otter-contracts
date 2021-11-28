@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
-import './interfaces/IOtterBondingCalculator.sol';
+import './interfaces/IBondingCalculator.sol';
 import './interfaces/IERC20.sol';
 import './interfaces/IUniswapV2Pair.sol';
 
@@ -12,7 +12,7 @@ import './libraries/BitMath.sol';
 import './libraries/FixedPoint.sol';
 
 
-contract OtterBondingCalculator is IOtterBondingCalculator {
+contract OtterBondingCalculator is IBondingCalculator {
 
     using FixedPoint for *;
     using SafeMath for uint;

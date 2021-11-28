@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
-import "./interfaces/IOtterTreasury.sol";
 import "./interfaces/IOtterBondingCalculator.sol";
 
 import "./types/Ownable.sol";
@@ -27,7 +26,6 @@ contract OtterBondDepository is Ownable {
     address public immutable CLAM; // token given as payment for bond
     address public immutable principle; // token used to create bond
     address public immutable treasury; // mints CLAM when receives principle
-    address public immutable DAO; // receives profit share from bond
 
     bool public immutable isLiquidityBond; // LP and Reserve bonds are treated slightly different
     address public immutable bondCalculator; // calculates value of LP tokens
@@ -49,7 +47,6 @@ contract OtterBondDepository is Ownable {
         uint vestingTerm; // in seconds
         uint minimumPrice; // vs principle value
         uint maxPayout; // in thousandths of a %. i.e. 500 = 0.5%
-        uint fee; // as % of bond payout, in hundreths. ( 500 = 5% = 0.05 for every 1 paid)
         uint maxDebt; // 9 decimal debt ratio, max % total supply created as debt
     }
 
@@ -77,7 +74,6 @@ contract OtterBondDepository is Ownable {
         address _CLAM,
         address _principle,
         address _treasury,
-        address _DAO,
         address _bondCalculator
     ) {
         require( _CLAM != address(0) );
@@ -86,11 +82,22 @@ contract OtterBondDepository is Ownable {
         principle = _principle;
         require( _treasury != address(0) );
         treasury = _treasury;
-        require( _DAO != address(0) );
-        DAO = _DAO;
+
         // bondCalculator should be address(0) if not LP bond
         bondCalculator = _bondCalculator;
         isLiquidityBond = ( _bondCalculator != address(0) );
+    }
+
+    /**
+        @notice returns CLAM valuation of asset
+        @param _token address
+        @param _amount uint
+        @return value_ uint
+     */
+    function valueOfToken( address _token, uint _amount ) public view returns ( uint value_ ) {
+        // will only work for LP tokens.
+        value_ = IOtterBondingCalculator( bondCalculator ).valuation( _token, _amount );
+        return value_;
     }
 
     /**
@@ -99,7 +106,6 @@ contract OtterBondDepository is Ownable {
      *  @param _vestingTerm uint
      *  @param _minimumPrice uint
      *  @param _maxPayout uint
-     *  @param _fee uint
      *  @param _maxDebt uint
      *  @param _initialDebt uint
      */
@@ -108,7 +114,6 @@ contract OtterBondDepository is Ownable {
         uint _vestingTerm,
         uint _minimumPrice,
         uint _maxPayout,
-        uint _fee,
         uint _maxDebt,
         uint _initialDebt
     ) external onlyOwner() {
@@ -118,7 +123,6 @@ contract OtterBondDepository is Ownable {
             vestingTerm: _vestingTerm,
             minimumPrice: _minimumPrice,
             maxPayout: _maxPayout,
-            fee: _fee,
             maxDebt: _maxDebt
         });
         totalDebt = _initialDebt;
@@ -141,9 +145,6 @@ contract OtterBondDepository is Ownable {
         } else if ( _parameter == PARAMETER.PAYOUT ) { // 1
             require( _input <= 1000, "Payout cannot be above 1 percent" );
             terms.maxPayout = _input;
-        } else if ( _parameter == PARAMETER.FEE ) { // 2
-            require( _input <= 10000, "DAO fee cannot exceed payout" );
-            terms.fee = _input;
         } else if ( _parameter == PARAMETER.DEBT ) { // 3
             terms.maxDebt = _input;
         }
@@ -173,7 +174,6 @@ contract OtterBondDepository is Ownable {
         });
     }
 
-
     /* ======== USER FUNCTIONS ======== */
 
     /**
@@ -198,28 +198,19 @@ contract OtterBondDepository is Ownable {
 
         require( _maxPrice >= nativePrice, "Slippage limit: more than max price" ); // slippage protection
 
-        uint value = IOtterTreasury( treasury ).valueOfToken( principle, _amount );
+        uint value = valueOfToken( principle, _amount );
         uint payout = payoutFor( value ); // payout to bonder is computed
 
         require( payout >= 10000000, "Bond too small" ); // must be > 0.01 CLAM ( underflow protection )
         require( payout <= maxPayout(), "Bond too large"); // size protection because there is no slippage
 
         // profits are calculated
-        uint fee = payout.mul( terms.fee ).div( 10000 );
-        uint profit = value.sub( payout ).sub( fee );
+        uint profit = value.sub( payout );
 
-        /**
-            principle is transferred in
-            approved and
-            deposited into the treasury, returning (_amount - profit) CLAM
+        /*
+            principle is transferred directly into the treasury
          */
-        IERC20( principle ).safeTransferFrom( msg.sender, address(this), _amount );
-        IERC20( principle ).approve( address( treasury ), _amount );
-        IOtterTreasury( treasury ).deposit( _amount, principle, profit );
-
-        if ( fee != 0 ) { // fee is transferred to dao
-            IERC20( CLAM ).safeTransfer( DAO, fee );
-        }
+        IERC20( principle ).safeTransferFrom( msg.sender, treasury, _amount );
 
         // total debt is increased
         totalDebt = totalDebt.add( value );
@@ -271,13 +262,10 @@ contract OtterBondDepository is Ownable {
         }
     }
 
-
-
-
     /* ======== INTERNAL HELPER FUNCTIONS ======== */
 
     /**
-     *  @notice allow user to stake payout automatically
+     *  @notice allow user to get paid. no staking bc we don't do that rebase
      *  @param _recipient address
      *  @param _amount uint
      *  @return uint
@@ -326,6 +314,8 @@ contract OtterBondDepository is Ownable {
      */
     function maxPayout() public view returns ( uint ) {
         return IERC20( CLAM ).totalSupply().mul( terms.maxPayout ).div( 100000 );
+        // unsure about this if you have tokens on multiple chains
+        // maybe having a min amount instead?
     }
 
     /**
@@ -336,7 +326,6 @@ contract OtterBondDepository is Ownable {
     function payoutFor( uint _value ) public view returns ( uint ) {
         return FixedPoint.fraction( _value, bondPrice() ).decode112with18().div( 1e16 );
     }
-
 
     /**
      *  @notice calculate current bond premium
@@ -373,7 +362,6 @@ contract OtterBondDepository is Ownable {
             price_ = bondPrice().mul( 10 ** IERC20( principle ).decimals() ).div( 100 );
         }
     }
-
 
     /**
      *  @notice calculate current ratio of debt to CLAM supply
@@ -419,7 +407,6 @@ contract OtterBondDepository is Ownable {
         }
     }
 
-
     /**
      *  @notice calculate how far into vesting a depositor is
      *  @param _depositor address
@@ -453,19 +440,16 @@ contract OtterBondDepository is Ownable {
         }
     }
 
-
-
-
     /* ======= AUXILLIARY ======= */
 
     /**
-     *  @notice allow anyone to send lost tokens (excluding principle or CLAM) to the DAO
+     *  @notice allow anyone to send lost tokens (excluding principle or CLAM) to the treasury
      *  @return bool
      */
     function recoverLostToken( address _token ) external returns ( bool ) {
         require( _token != CLAM );
         require( _token != principle );
-        IERC20( _token ).safeTransfer( DAO, IERC20( _token ).balanceOf( address(this) ) );
+        IERC20( _token ).safeTransfer( treasury, IERC20( _token ).balanceOf( address(this) ) );
         return true;
     }
 }
