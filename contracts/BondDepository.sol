@@ -23,7 +23,7 @@ contract BondDepository is Ownable {
     event ControlVariableAdjustment( uint initialBCV, uint newBCV, uint adjustment, bool addition );
 
     /* ======== STATE VARIABLES ======== */
-    address public immutable CLAM; // token given as payment for bond
+    address public immutable rewardToken; // token given as payment for bond
     address public immutable principle; // token used to create bond
     address public immutable treasury; // sends money to a multisig
 
@@ -53,7 +53,7 @@ contract BondDepository is Ownable {
 
     // Info for bond holder
     struct Bond {
-        uint payout; // CLAM remaining to be paid
+        uint payout; // rewardToken remaining to be paid
         uint vesting; // Blocks left to vest
         uint lastTimestamp; // Last interaction
         uint pricePaid; // In DAI, for front end viewing
@@ -72,13 +72,13 @@ contract BondDepository is Ownable {
     /* ======== INITIALIZATION ======== */
 
     constructor (
-        address _CLAM,
+        address _rewardToken,
         address _principle,
         address _treasury,
         address _bondCalculator
     ) {
-        require( _CLAM != address(0) );
-        CLAM = _CLAM;
+        require( _rewardToken != address(0) );
+        rewardToken = _rewardToken;
         require( _principle != address(0) );
         principle = _principle;
         require( _treasury != address(0) );
@@ -90,19 +90,13 @@ contract BondDepository is Ownable {
     }
 
     /**
-        @notice returns CLAM valuation of asset
+        @notice returns rewardToken valuation of asset
         @param _amount uint
         @return value_ uint
      */
     function valueOfToken(uint _amount ) public view returns ( uint value_ ) {
-        // will only work for LP tokens.
-        if ( !isLiquidityBond ) {
-            // convert amount to match CLAM decimals
-            value_ = _amount.mul( 10 ** IERC20( CLAM ).decimals() ).div( 10 ** IERC20( principle ).decimals() );
-        } else {
-            value_ = IBondingCalculator( bondCalculator ).valuation( principle, _amount );
-        }
-        return value_;
+        // convert amount to match payout token decimals
+        value_ = _amount.mul( 10 ** IERC20( rewardToken ).decimals() ).div( 10 ** IERC20( principle ).decimals() );
     }
 
     /**
@@ -197,7 +191,7 @@ contract BondDepository is Ownable {
      *  @return uint
      */
     function fund(uint _amount) public onlyOwner() returns (uint) {
-        IERC20( CLAM ).safeTransferFrom(msg.sender, address(this), _amount );
+        IERC20( rewardToken ).safeTransferFrom(msg.sender, address(this), _amount );
         availableDebt = availableDebt.add(_amount);
     }
 
@@ -228,11 +222,11 @@ contract BondDepository is Ownable {
         uint value = valueOfToken(_amount );
         uint payout = payoutFor( value ); // payout to bonder is computed
 
-        require( payout >= 10000000, "Bond too small" ); // must be > 0.01 CLAM ( underflow protection )
+        require( payout >= 10000000, "Bond too small" ); // must be > 0.01 rewardToken ( underflow protection )
         require( payout <= maxPayout(), "Bond too large"); // size protection because there is no slippage
         
         // **** check that 
-            // payout cannot exceed the balance deposited (in CLAM)
+            // payout cannot exceed the balance deposited (in rewardToken)
         require( payout < availableDebt, "Not enough reserves."); // leave 1 gwei for good luck.
 
         /*
@@ -301,7 +295,7 @@ contract BondDepository is Ownable {
      *  @return uint
      */
     function sendPayout( address _recipient, uint _amount ) internal returns ( uint ) {
-        IERC20( CLAM ).safeTransfer( _recipient, _amount ); // send payout
+        IERC20( rewardToken ).safeTransfer( _recipient, _amount ); // send payout
         return _amount;
     }
 
@@ -344,7 +338,7 @@ contract BondDepository is Ownable {
      */
     function maxPayout() public view returns ( uint ) {
         // **** change as uint.
-        return maxpayout;//IERC20( CLAM ).totalSupply().mul( terms.maxPayout ).div( 100000 );
+        return maxpayout;//IERC20( rewardToken ).totalSupply().mul( terms.maxPayout ).div( 100000 );
         // unsure about this if you have tokens on multiple chains
         // maybe having a min amount instead?
     }
@@ -374,9 +368,9 @@ contract BondDepository is Ownable {
      *  @return price_ uint
      */
     function _bondPrice() internal returns ( uint price_ ) {
-        price_ = terms.controlVariable.mul( debtRatio() ).add( 1e18 ).div( 1e16 ); // possibly. need to double check bc we're moving from 9 decimals to 18.
+        price_ = terms.controlVariable.mul( debtRatio() ).div( 10 ** (uint256(IERC20( rewardToken ).decimals()).sub(5)) );
         if ( price_ < terms.minimumPrice ) {
-            price_ = terms.minimumPrice;
+            price_ = terms.minimumPrice;        
         } else if ( terms.minimumPrice != 0 ) {
             terms.minimumPrice = 0;
         }
@@ -395,11 +389,11 @@ contract BondDepository is Ownable {
     }
 
     /**
-     *  @notice calculate current ratio of debt to CLAM supply
+     *  @notice calculate current ratio of debt to rewardToken supply
      *  @return debtRatio_ uint
      */
     function debtRatio() public view returns ( uint debtRatio_ ) {
-        uint supply = IERC20( CLAM ).totalSupply();
+        uint supply = IERC20( rewardToken ).totalSupply();
         debtRatio_ = FixedPoint.fraction(
             currentDebt().mul( 1e18 ),
             supply
@@ -456,7 +450,7 @@ contract BondDepository is Ownable {
     }
 
     /**
-     *  @notice calculate amount of CLAM available for claim by depositor
+     *  @notice calculate amount of rewardToken available for claim by depositor
      *  @param _depositor address
      *  @return pendingPayout_ uint
      */
@@ -474,12 +468,12 @@ contract BondDepository is Ownable {
     /* ======= AUXILLIARY ======= */
 
     /**
-     *  @notice allow anyone to send lost tokens (excluding principle or CLAM) to the treasury
+     *  @notice allow owner to send lost tokens (excluding principle or rewardToken) to the treasury
      *  @return bool
      */
-    function recoverLostToken( address _token ) external returns ( bool ) {
-        require( _token != CLAM );
-        require( _token != principle );
+    function recoverLostToken( address _token ) onlyOwner() external returns ( bool ) {
+        //require( _token != rewardToken );
+        //require( _token != principle );
         IERC20( _token ).safeTransfer( treasury, IERC20( _token ).balanceOf( address(this) ) );
         return true;
     }
