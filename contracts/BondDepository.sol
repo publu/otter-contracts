@@ -116,7 +116,8 @@ contract BondDepository is Ownable {
         uint _maxDebt,
         uint _initialDebt
     ) external onlyOwner() {
-        require( terms.controlVariable == 0, "Bonds must be initialized from 0" );
+        // add back when done testing
+        //require( terms.controlVariable == 0, "Bonds must be initialized from 0" );
         terms = Terms ({
             controlVariable: _controlVariable,
             vestingTerm: _vestingTerm,
@@ -127,7 +128,6 @@ contract BondDepository is Ownable {
         totalDebt = _initialDebt;
         lastDecay = block.timestamp;
     }
-
 
     /* ======== POLICY FUNCTIONS ======== */
 
@@ -393,10 +393,10 @@ contract BondDepository is Ownable {
      *  @return debtRatio_ uint
      */
     function debtRatio() public view returns ( uint debtRatio_ ) {
-        uint supply = IERC20( rewardToken ).totalSupply();
+        uint256 totalAvail = uint256(IERC20( rewardToken ).balanceOf(address(this))).add(currentDebt());
         debtRatio_ = FixedPoint.fraction(
             currentDebt().mul( 1e18 ),
-            supply
+            totalAvail
         ).decode112with18().div( 1e18 );
     }
 
