@@ -357,7 +357,7 @@ contract BondDepository is Ownable {
      *  @return price_ uint
      */
     function bondPrice() public view returns ( uint price_ ) {
-        price_ = terms.controlVariable.mul( debtRatio() ).div( 10 ** (uint256(IERC20( rewardToken ).decimals()).sub(5)) );
+        price_ = terms.controlVariable.mul( debtRatio() ).div( 10 ** (uint256(IERC20( rewardToken ).decimals()).sub(1)) );
         if ( price_ < terms.minimumPrice ) {
             price_ = terms.minimumPrice;
         }
@@ -368,7 +368,7 @@ contract BondDepository is Ownable {
      *  @return price_ uint
      */
     function _bondPrice() internal returns ( uint price_ ) {
-        price_ = terms.controlVariable.mul( debtRatio() ).div( 10 ** (uint256(IERC20( rewardToken ).decimals()).sub(5)) );
+        price_ = terms.controlVariable.mul( debtRatio() ).div( 10 ** (uint256(IERC20( rewardToken ).decimals()).sub(1)) );
         if ( price_ < terms.minimumPrice ) {
             price_ = terms.minimumPrice;        
         } else if ( terms.minimumPrice != 0 ) {
