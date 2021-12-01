@@ -1,8 +1,13 @@
 const { ethers } = require('hardhat')
 const { BigNumber } = require('@ethersproject/bignumber')
-const { formatUnits, formatEther } = require('@ethersproject/units')
+const { formatUnits, formatEther, parseEther } = require('@ethersproject/units')
+
+function options() {
+  return { };
+}
 
 async function main() {
+  parseEther('500');
   const largeApproval = '100000000000000000000000000000000'
 
   // What epoch will be first epoch
@@ -28,9 +33,8 @@ async function main() {
 
   const dai = await ethers.getContractAt(
     'OtterClamERC20',
-    '0x1dbba57b3d9719c007900d21e8541e90bc6933ec'
-
-  );// but actually qi/usdc lp
+    '0xe7519be0e2a4450815858343ca480d1939be7281'
+  );// but actually qi/dai lp, decimals matter
 
 /*
   daiBond = await ethers.getContractAt(
@@ -45,7 +49,8 @@ async function main() {
   )
 
   const bondingCalc = await BondingCalcContract.deploy(
-      qi.address
+      qi.address,
+      options()
     )
 
   await bondingCalc.deployed();
@@ -68,39 +73,33 @@ async function main() {
       dai.address,
       treasury,
       bondingCalc.address, // change this to bondingCalc only if u need it!
+      options()
     )
 
   await daiBond.deployed()
 
-  await (await daiBond.setMaxPayout("80000000000000000000000000000")).wait();
+  await (await daiBond.setMaxPayout("80000000000000000000000000000", options())).wait();
   console.log("b4 approval");
-  await (await qi.approve(daiBond.address, "10000000000000000000000000000000")).wait();
+  await (await qi.approve(daiBond.address, "10000000000000000000000000000000", options())).wait();
 
   console.log("before fund")
   const funding = await qi.balanceOf("0xe00eaa2787a8830a485153b7bf508bc781e4a220");
   
   console.log(funding.toString());
 
-  await (await daiBond.fund("1000000000000000000")).wait();
-  await (await dai.approve(daiBond.address, largeApproval)).wait();
+  await (await daiBond.fund("1000000000000000000", options())).wait(5);
+  await (await dai.approve(daiBond.address, largeApproval, options())).wait();
 
   console.log("funded.")
 
-  
-  const bcv = 38
-  const bondVestingLength = 10
-  const minBondPrice = 35 // bond price = $0.35
-  const maxBondPayout = 1000 // 1000 = 1% of CLAM total supply
-  const maxBondDebt = '8000000000000000'
-  const initialBondDebt = 0
-
   await (await daiBond.initializeBondTerms(
-      bcv,
-      bondVestingLength,
-      minBondPrice,
-      maxBondPayout, // Max bond payout,
-      maxBondDebt,
-      initialBondDebt
+      '15', // bcv
+      '10', // vesting length
+      '35', // min price
+      '10000', // max bond payout 
+      '8000000000000000', // max bond debt
+      '0', // initial debt 0 qi
+      options()
     )).wait()
 }
 
