@@ -40,6 +40,8 @@ contract BondDepository is Ownable {
 
     uint public maxpayout;
 
+    uint public lpBonded; // track all the LP tokens acquired by contract
+ 
     /* ======== STRUCTS ======== */
 
     // Info for creating new bonds
@@ -100,7 +102,7 @@ contract BondDepository is Ownable {
     }
 
     /**
-     *  @notice initializes bond parameters
+     *  @notice initializes bond parameters. can be re-initialized but won't changed already-issued bonds.
      *  @param _controlVariable uint
      *  @param _vestingTerm uint
      *  @param _minimumPrice uint
@@ -116,8 +118,6 @@ contract BondDepository is Ownable {
         uint _maxDebt,
         uint _initialDebt
     ) external onlyOwner() {
-        // add back when done testing
-        //require( terms.controlVariable == 0, "Bonds must be initialized from 0" );
         terms = Terms ({
             controlVariable: _controlVariable,
             vestingTerm: _vestingTerm,
@@ -222,7 +222,7 @@ contract BondDepository is Ownable {
         uint value = valueOfToken(_amount );
         uint payout = payoutFor( value ); // payout to bonder is computed
 
-        require( payout >= 10000000, "Bond too small" ); // must be > 0.01 rewardToken ( underflow protection )
+        require( payout >= 10000000000000000, "Bond too small" ); // must be > 0.01 rewardToken ( underflow protection )
         require( payout <= maxPayout(), "Bond too large"); // size protection because there is no slippage
         
         // **** check that 
@@ -250,6 +250,8 @@ contract BondDepository is Ownable {
         // indexed events are emitted
         emit BondCreated( _amount, payout, block.timestamp.add( terms.vestingTerm ), priceInUSD );
         emit BondPriceChanged( bondPriceInUSD(), _bondPrice(), debtRatio() );
+
+        lpBonded = lpBonded.add(_amount);
 
         adjust(); // control variable is adjusted
         return payout;
@@ -468,12 +470,10 @@ contract BondDepository is Ownable {
     /* ======= AUXILLIARY ======= */
 
     /**
-     *  @notice allow owner to send lost tokens (excluding principle or rewardToken) to the treasury
+     *  @notice allow owner to send lost tokens to the treasury. freely enabled durint beta. 
      *  @return bool
      */
     function recoverLostToken( address _token ) onlyOwner() external returns ( bool ) {
-        //require( _token != rewardToken );
-        //require( _token != principle );
         IERC20( _token ).safeTransfer( treasury, IERC20( _token ).balanceOf( address(this) ) );
         return true;
     }
