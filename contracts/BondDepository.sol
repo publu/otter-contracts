@@ -31,7 +31,6 @@ contract BondDepository is Ownable {
     address public immutable bondCalculator; // calculates value of LP tokens
 
     Terms public terms; // stores terms for new bonds
-    Adjust public adjustment; // stores adjustment to BCV data
 
     mapping( address => Bond ) public bondInfo; // stores bond information for depositors
 
@@ -60,16 +59,6 @@ contract BondDepository is Ownable {
         uint lastTimestamp; // Last interaction
         uint pricePaid; // In DAI, for front end viewing
     }
-
-    // Info for incremental adjustments to control variable
-    struct Adjust {
-        bool add; // addition or subtraction
-        uint rate; // increment
-        uint target; // BCV when adjustment finished
-        uint buffer; // minimum length (in seconds) between adjustments
-        uint lastTimestamp; // block when last adjustment made
-    }
-
 
     /* ======== INITIALIZATION ======== */
 
@@ -102,7 +91,7 @@ contract BondDepository is Ownable {
     }
 
     /**
-     *  @notice initializes bond parameters. can be re-initialized but won't changed already-issued bonds.
+     *  @notice updates bond parameters. updated over time but won't change already-issued bonds.
      *  @param _controlVariable uint
      *  @param _vestingTerm uint
      *  @param _minimumPrice uint
@@ -110,7 +99,7 @@ contract BondDepository is Ownable {
      *  @param _maxDebt uint
      *  @param _initialDebt uint
      */
-    function initializeBondTerms(
+    function updateBondTerms(
         uint _controlVariable,
         uint _vestingTerm,
         uint _minimumPrice,
@@ -132,46 +121,6 @@ contract BondDepository is Ownable {
     /* ======== POLICY FUNCTIONS ======== */
 
     enum PARAMETER { VESTING, PAYOUT, FEE, DEBT }
-    /**
-     *  @notice set parameters for new bonds
-     *  @param _parameter PARAMETER
-     *  @param _input uint
-     */
-    function setBondTerms ( PARAMETER _parameter, uint _input ) external onlyOwner() {
-        if ( _parameter == PARAMETER.VESTING ) { // 0
-            require( _input >= 36 * 60 * 60, "Vesting must be longer than 36 hours" );
-            terms.vestingTerm = _input;
-        } else if ( _parameter == PARAMETER.PAYOUT ) { // 1
-            require( _input <= 1000, "Payout cannot be above 1 percent" );
-            terms.maxPayout = _input;
-        } else if ( _parameter == PARAMETER.DEBT ) { // 3
-            terms.maxDebt = _input;
-        }
-    }
-
-    /**
-     *  @notice set control variable adjustment
-     *  @param _addition bool
-     *  @param _increment uint
-     *  @param _target uint
-     *  @param _buffer uint
-     */
-    function setAdjustment (
-        bool _addition,
-        uint _increment,
-        uint _target,
-        uint _buffer
-    ) external onlyOwner() {
-        require( _increment <= Math.max(terms.controlVariable.mul( 25 ).div( 1000 ), 1), "Increment too large" );
-
-        adjustment = Adjust({
-            add: _addition,
-            rate: _increment,
-            target: _target,
-            buffer: _buffer,
-            lastTimestamp: block.timestamp
-        });
-    }
 
     /**
      *  @notice set max payout
